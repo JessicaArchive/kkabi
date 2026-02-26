@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes
 
 from claude.runner import run_claude, cancel_task, is_running
 from claude.context import build_full_prompt, load_system_prompt, save_system_prompt
+from memory.persona import load_persona_file, save_persona_file, VALID_NAMES
 from claude.queue import execution_queue
 from claude.retry import retry_queue
 from db.store import save_execution, save_conversation, get_recent_executions, get_recent_conversations
@@ -298,6 +299,38 @@ async def cmd_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 @authorized
+async def cmd_persona(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "사용법:\n"
+            "/persona soul — 성격 조회\n"
+            "/persona user — 사용자 정보 조회\n"
+            "/persona mood — 현재 모드 조회\n"
+            "/persona soul <내용> — 성격 변경"
+        )
+        return
+
+    name = context.args[0].lower()
+    if name not in VALID_NAMES:
+        await update.message.reply_text(f"유효한 이름: {', '.join(sorted(VALID_NAMES))}")
+        return
+
+    # View
+    if len(context.args) == 1:
+        content = load_persona_file(name)
+        if not content:
+            await update.message.reply_text(f"[{name.upper()}] 파일이 비어있습니다.")
+        else:
+            await send_long_message(update, f"[{name.upper()}]\n{content}")
+        return
+
+    # Edit
+    new_content = " ".join(context.args[1:])
+    save_persona_file(name, new_content)
+    await update.message.reply_text(f"✅ {name.upper()}.md 변경됨")
+
+
+@authorized
 async def cmd_getfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("사용법: /getfile <경로>")
@@ -341,6 +374,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /memory\\_clear — 오늘 로그 초기화
 /forget — 대화 맥락 초기화
 /system [프롬프트] — 시스템 프롬프트 확인/변경
+/persona <soul|user|mood> — 페르소나 조회/변경
 /getfile <경로> — 서버 파일 다운로드
 /cron list — 크론잡 목록
 /cron add <표현식> <설명> — 크론잡 추가

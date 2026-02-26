@@ -26,6 +26,7 @@ from bot.handlers import (
     cmd_memory_clear,
     cmd_forget,
     cmd_system,
+    cmd_persona,
     cmd_getfile,
     cmd_cancel,
     cmd_running,
@@ -75,6 +76,7 @@ def main():
     os.makedirs(os.path.join(os.path.dirname(__file__), "data", "uploads"), exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(__file__), "data", "memory", "logs"), exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(__file__), "data", "memory", "projects"), exist_ok=True)
+    os.makedirs(os.path.join(os.path.dirname(__file__), "data", "persona"), exist_ok=True)
 
     # Build application
     app = Application.builder().token(token).build()
@@ -89,6 +91,7 @@ def main():
     app.add_handler(CommandHandler("memory_clear", cmd_memory_clear))
     app.add_handler(CommandHandler("forget", cmd_forget))
     app.add_handler(CommandHandler("system", cmd_system))
+    app.add_handler(CommandHandler("persona", cmd_persona))
     app.add_handler(CommandHandler("getfile", cmd_getfile))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("running", cmd_running))

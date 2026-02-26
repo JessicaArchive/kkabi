@@ -1,5 +1,6 @@
 import os
 from memory.prompts import build_memory_block, build_conversation_block
+from memory.persona import build_persona_block
 from db.store import get_recent_conversations
 
 SYSTEM_PROMPT_PATH = os.path.join(
@@ -32,7 +33,11 @@ async def build_full_prompt(user_message: str, max_turns: int = 5) -> str:
     recent = await get_recent_conversations(max_turns)
     conversation_block = build_conversation_block(recent)
 
+    persona_block = build_persona_block()
+
     parts = [f"[시스템] {system_prompt}"]
+    if persona_block:
+        parts.append(f"\n{persona_block}")
     if memory_block:
         parts.append(f"\n{memory_block}")
     if conversation_block:
