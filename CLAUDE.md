@@ -574,6 +574,241 @@ crontab -e
 
 ---
 
+## macOS 배포
+
+macOS에서는 **launchd**로 항상 실행한다. 코드는 GCP와 100% 동일하고 데몬 등록만 다르다.
+
+### 설치
+
+```bash
+# 프로젝트 클론
+cd ~
+git clone <repo-url> kkabi
+cd kkabi
+
+# 가상환경
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 설정
+cp config.example.json config.json
+nano config.json  # 봇 토큰, 사용자 ID 입력
+
+# 디렉토리 생성
+mkdir -p data/memory/logs data/memory/projects data/uploads logs
+```
+
+### launchd 서비스 (deploy/com.kkabi.plist)
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kkabi</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/유저이름/kkabi/venv/bin/python</string>
+        <string>/Users/유저이름/kkabi/main.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/유저이름/kkabi</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/유저이름/kkabi/logs/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/유저이름/kkabi/logs/stderr.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/Users/유저이름/.npm-global/bin</string>
+        <key>GITHUB_TOKEN</key>
+        <string>ghp_xxxxx</string>
+    </dict>
+</dict>
+</plist>
+```
+
+### 서비스 등록 및 관리
+
+```bash
+# plist 복사
+cp deploy/com.kkabi.plist ~/Library/LaunchAgents/
+
+# 서비스 등록 (로그인 시 자동 시작)
+launchctl load ~/Library/LaunchAgents/com.kkabi.plist
+
+# 상태 확인
+launchctl list | grep kkabi
+
+# 중지
+launchctl unload ~/Library/LaunchAgents/com.kkabi.plist
+
+# 재시작
+launchctl unload ~/Library/LaunchAgents/com.kkabi.plist
+launchctl load ~/Library/LaunchAgents/com.kkabi.plist
+
+# 로그 확인
+tail -f ~/kkabi/logs/stdout.log
+tail -f ~/kkabi/logs/stderr.log
+```
+
+### macOS 주의사항
+
+1. **슬립 방지**: 맥이 잠들면 봇이 멈춘다. 항상 실행하려면:
+   - 시스템 설정 → 에너지 절약 → "네트워크 접근 시 깨우기" 활성화
+   - 또는 `caffeinate -s &`로 슬립 방지 (임시)
+   - 서버 용도면 `pmset` 설정 변경:
+     ```bash
+     sudo pmset -a sleep 0          # 잠들지 않음
+     sudo pmset -a disablesleep 1   # 완전 비활성화
+     ```
+
+2. **Claude Code 인증**: macOS에서는 브라우저가 있으므로 `claude login`만 하면 자동 인증.
+
+3. **백업**: iCloud Drive나 로컬 Time Machine 활용.
+   ```bash
+   # data/ 를 iCloud에 동기화
+   rsync -av ~/kkabi/data/ ~/Library/Mobile\ Documents/com~apple~CloudDocs/kkabi-backup/
+   ```
+
+---
+
+## Windows 배포
+
+Windows는 두 가지 방법이 있다. **WSL2 추천** (Linux와 동일하게 쓸 수 있어서).
+
+### 방법 A: WSL2 사용 (추천)
+
+WSL2 안에서 Linux와 동일하게 설치하고, systemd로 데몬 등록한다.
+
+```powershell
+# 1. WSL2 설치 (PowerShell 관리자 권한)
+wsl --install -d Ubuntu
+
+# 2. WSL 접속
+wsl
+
+# 3. 이후는 Linux(GCP)와 100% 동일
+cd ~
+git clone <repo-url> kkabi
+cd kkabi
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+# ... (GCP 설치 과정 그대로)
+```
+
+**WSL2에서 systemd 활성화:**
+```bash
+# /etc/wsl.conf 편집
+sudo nano /etc/wsl.conf
+```
+```ini
+[boot]
+systemd=true
+```
+```bash
+# WSL 재시작 (PowerShell에서)
+wsl --shutdown
+wsl
+```
+
+이후 systemd 서비스 등록은 GCP와 동일:
+```bash
+sudo cp deploy/kkabi.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable kkabi
+sudo systemctl start kkabi
+```
+
+**Windows 부팅 시 WSL 자동 시작:**
+```
+# 시작 프로그램에 추가 (shell:startup 폴더에 .vbs 파일)
+```
+
+`deploy/start-wsl.vbs`:
+```vbs
+Set ws = CreateObject("Wscript.Shell")
+ws.Run "wsl -d Ubuntu", 0
+```
+이 파일을 `shell:startup` 폴더에 넣으면 Windows 부팅 시 WSL이 백그라운드에서 시작되고, systemd가 깨비를 자동 실행한다.
+
+---
+
+### 방법 B: 네이티브 Windows (WSL 없이)
+
+WSL을 쓸 수 없는 환경이라면 작업 스케줄러를 사용한다.
+
+```powershell
+# 설치
+cd %USERPROFILE%
+git clone <repo-url> kkabi
+cd kkabi
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+cp config.example.json config.json
+# config.json 편집
+```
+
+**작업 스케줄러 등록 (deploy/install-windows.bat):**
+```bat
+@echo off
+echo === Kkabi Windows 설치 ===
+
+:: 작업 스케줄러에 등록 (로그온 시 자동 시작, 크래시 시 재시작)
+schtasks /create ^
+  /tn "Kkabi" ^
+  /tr "\"%USERPROFILE%\kkabi\venv\Scripts\python.exe\" \"%USERPROFILE%\kkabi\main.py\"" ^
+  /sc onlogon ^
+  /rl highest ^
+  /f
+
+:: 지금 바로 시작
+schtasks /run /tn "Kkabi"
+
+echo.
+echo 완료! 작업 스케줄러에서 "Kkabi" 확인하세요.
+echo 중지: schtasks /end /tn "Kkabi"
+echo 삭제: schtasks /delete /tn "Kkabi" /f
+```
+
+**Windows 주의사항:**
+
+1. **Claude Code on Windows**: Claude Code는 공식적으로 WSL 사용을 권장한다. 네이티브 Windows에서 돌리면 일부 MCP 서버가 동작하지 않을 수 있음.
+2. **경로**: Windows 경로(`C:\Users\...`)와 config.json의 `work_dir`이 맞는지 확인.
+3. **PowerShell vs CMD**: `main.py` 실행 시 환경변수가 잡히는지 확인. `GITHUB_TOKEN` 등은 시스템 환경변수로 등록 권장.
+
+---
+
+## 크로스 플랫폼 요약
+
+| 항목 | GCP (Linux) | macOS | Windows (WSL2) | Windows (네이티브) |
+|------|-------------|-------|----------------|-------------------|
+| 코드 | 동일 | 동일 | 동일 | 동일 |
+| 데몬 | systemd | launchd | systemd | 작업 스케줄러 |
+| 자동 시작 | systemctl enable | RunAtLoad | systemctl enable | schtasks /sc onlogon |
+| 크래시 복구 | Restart=always | KeepAlive | Restart=always | 수동 재실행 |
+| Claude Code | ✅ | ✅ | ✅ | ⚠️ WSL 권장 |
+| MCP 서버 | ✅ | ✅ | ✅ | ⚠️ 일부 제한 |
+| 슬립 문제 | 없음 | ⚠️ 설정 필요 | 없음 | ⚠️ 절전 설정 |
+| 추천도 | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐ |
+
+---
+
 ## 테스트 시나리오
 
 1. "안녕" → Claude 응답 확인
@@ -650,9 +885,13 @@ kkabi/
 ├── scripts/
 │   └── setup-mcp.sh
 ├── deploy/
-│   ├── kkabi.service
-│   ├── install.sh
-│   └── backup.sh                 ← GCS 백업
+│   ├── kkabi.service              ← Linux systemd
+│   ├── com.kkabi.plist            ← macOS launchd
+│   ├── install.sh                 ← Linux/GCP 설치
+│   ├── install-mac.sh             ← macOS 설치
+│   ├── install-windows.bat        ← Windows 설치
+│   ├── start-wsl.vbs              ← Windows 부팅 시 WSL 자동 시작
+│   └── backup.sh                  ← GCS 백업
 └── .gitignore
 ```
 
