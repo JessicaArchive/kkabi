@@ -1,0 +1,27 @@
+{
+  "telegram": {
+    "bot_token": "YOUR_BOT_TOKEN_HERE",
+    "allowed_user_ids": []
+  },
+  "claude": {
+    "timeout_sec": 300,
+    "max_concurrent": 1,
+    "queue_max_size": 10,
+    "default_work_dir": "~"
+  },
+  "memory": {
+    "max_context_turns": 5,
+    "response_save_limit": 500,
+    "memory_md_max_chars": 2000,
+    "log_retention_days": 30
+  },
+  "files": {
+    "max_upload_mb": 50,
+    "upload_dir": "data/uploads"
+  },
+  "safety": {
+    "confirm_keywords": ["삭제", "rm ", "drop ", "reset", "format", "deploy", "push"],
+    "confirm_message": "⚠️ 위험할 수 있는 작업입니다. 실행할까요?",
+    "auto_approve_cron": false
+  }
+}

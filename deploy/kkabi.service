@@ -1,0 +1,25 @@
+[Unit]
+Description=Kkabi - Telegram AI Assistant
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# ⚠️ 아래 '실제유저이름'을 GCP 인스턴스의 실제 사용자명으로 변경하세요 (whoami로 확인)
+User=실제유저이름
+WorkingDirectory=/home/실제유저이름/kkabi
+ExecStart=/home/실제유저이름/kkabi/venv/bin/python main.py
+Restart=always
+RestartSec=10
+
+# 환경변수
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/home/실제유저이름/.local/bin:/home/실제유저이름/.npm-global/bin
+# Environment=GITHUB_TOKEN=ghp_xxxxx
+
+# 로그
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kkabi
+
+[Install]
+WantedBy=multi-user.target
